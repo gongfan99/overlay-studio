@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0b0a08" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="description"
+      content="Align a transparent image sequence over video and export an H.264 MP4."
+    />
+    <title>Overlay Studio</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Overlay Studio home">
+          <span class="brand-mark" aria-hidden="true">O</span>
+          <span>Overlay Studio</span>
+        </a>
+        <div class="project-heading">
+          <span class="eyebrow">COMPOSITOR</span>
+          <span id="projectName" class="project-name">Untitled project</span>
+        </div>
+        <div class="topbar-actions">
+          <span id="appStatus" class="status-pill" role="status">Ready</span>
+          <button id="exportButton" class="button button-primary" type="button" disabled>
+            Export MP4
+          </button>
+        </div>
+      </header>
+
+      <main class="app-layout">
+        <aside class="side-panel asset-panel" aria-label="Assets">
+          <div class="panel-heading">
+            <div>
+              <span class="eyebrow">PROJECT MEDIA</span>
+              <h1>Assets</h1>
+            </div>
+          </div>
+
+          <section class="asset-section">
+            <div class="section-title-row">
+              <h2>Base video</h2>
+              <span id="videoBadge" class="mini-badge">Required</span>
+            </div>
+            <label id="videoDropzone" class="dropzone" for="videoInput">
+              <span class="dropzone-icon" aria-hidden="true">↥</span>
+              <span id="videoDropTitle" class="dropzone-title">Choose an MP4</span>
+              <span class="dropzone-hint">CFR footage · H.264 recommended</span>
+            </label>
+            <input id="videoInput" class="visually-hidden" type="file" accept="video/mp4,.mp4" />
+            <div id="videoDetails" class="asset-details empty-details">No video loaded</div>
+          </section>
+
+          <section class="asset-section">
+            <div class="section-title-row">
+              <h2>Overlay sequence</h2>
+              <span id="overlayBadge" class="mini-badge">Required</span>
+            </div>
+            <label id="overlayDropzone" class="dropzone" for="overlayInput">
+              <span class="dropzone-icon dropzone-icon-teal" aria-hidden="true">▧</span>
+              <span id="overlayDropTitle" class="dropzone-title">Choose a ZIP</span>
+              <span class="dropzone-hint">Numbered transparent PNG frames</span>
+            </label>
+            <input id="overlayInput" class="visually-hidden" type="file" accept=".zip,application/zip" />
+            <div id="overlayDetails" class="asset-details empty-details">No sequence loaded</div>
+            <label class="field-label offset-label" for="overlayStartFrame">Overlay starts at frame</label>
+            <input id="overlayStartFrame" class="text-input" type="number" min="0" step="1" value="0" />
+            <label
+              class="field-label offset-label"
+              for="overlayEndFrame"
+              title="The final output frame on the MP4 timeline. It defaults to the MP4 frame count. If it extends past the MP4, the last video frame and then the last PNG frame are held."
+            >Overlay ends at frame</label>
+            <input
+              id="overlayEndFrame"
+              class="text-input"
+              type="number"
+              min="1"
+              step="1"
+              value="1"
+              title="The final output frame on the MP4 timeline. It defaults to the MP4 frame count. If it extends past the MP4, the last video frame and then the last PNG frame are held."
+              aria-describedby="overlayEndFrameHelp"
+            />
+            <span id="overlayEndFrameHelp" class="visually-hidden">Frames beyond the MP4 hold its last frame; frames beyond the PNG sequence hold its last frame.</span>
+          </section>
+
+          <div class="asset-footnote">
+            <span class="footnote-dot" aria-hidden="true"></span>
+            <span>Files stay in this browser session.</span>
+          </div>
+        </aside>
+
+        <section class="center-workspace" aria-label="Video preview and timeline">
+          <div class="preview-toolbar">
+            <div class="preview-title-group">
+              <span class="live-indicator" aria-hidden="true"></span>
+              <span>Preview</span>
+              <span id="resolutionBadge" class="toolbar-muted">Waiting for video</span>
+            </div>
+            <div class="preview-actions">
+              <span id="previewHint" class="toolbar-muted">Load media to begin</span>
+            </div>
+          </div>
+
+          <div id="previewStage" class="preview-stage">
+            <canvas id="previewCanvas" aria-label="Video composite preview"></canvas>
+            <div id="previewEmpty" class="preview-empty">
+              <div class="preview-empty-mark" aria-hidden="true">◉</div>
+              <h2>Bring your scene together</h2>
+              <p>Load a base video and a numbered PNG sequence to start aligning your overlay.</p>
+              <div class="empty-shortcuts">
+                <span>MP4 video</span><span>+</span><span>PNG sequence ZIP</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="transport-bar">
+            <button id="previousFrameButton" class="icon-button" type="button" aria-label="Previous frame" title="Previous frame (←)">◀</button>
+            <button id="playButton" class="play-button" type="button" aria-label="Play preview" title="Play (Space)">▶</button>
+            <button id="nextFrameButton" class="icon-button" type="button" aria-label="Next frame" title="Next frame (→)">▶</button>
+            <div class="frame-readout">
+              <span id="currentTimecode" class="timecode">00:00:00:00</span>
+              <span class="readout-divider">/</span>
+              <span id="durationTimecode" class="timecode muted-timecode">00:00:00:00</span>
+            </div>
+            <label class="visually-hidden" for="frameSlider">Current frame</label>
+            <input id="frameSlider" class="frame-slider" type="range" min="0" max="0" value="0" disabled />
+            <label class="frame-input-wrap" for="frameNumberInput">
+              <span>FRAME</span>
+              <input id="frameNumberInput" type="number" min="0" step="1" value="0" disabled />
+            </label>
+          </div>
+
+          <section class="timeline-panel" aria-label="Transform timeline">
+            <div class="timeline-header">
+              <div>
+                <span class="eyebrow">ANIMATION</span>
+                <h2>Transform timeline</h2>
+              </div>
+              <div class="keyframe-nav">
+                <button id="previousKeyframeButton" class="button button-quiet button-small" type="button" disabled>Previous key</button>
+                <button id="nextKeyframeButton" class="button button-quiet button-small" type="button" disabled>Next key</button>
+              </div>
+            </div>
+            <div class="timeline-ruler-row">
+              <div class="track-label">VIDEO</div>
+              <div id="videoTrack" class="timeline-track video-track" role="group" aria-label="Video timeline" tabindex="0">
+                <span class="track-line"></span>
+              </div>
+            </div>
+            <div class="timeline-ruler-row">
+              <div class="track-label overlay-track-label"><span></span>OVERLAY</div>
+              <div id="overlayTrack" class="timeline-track overlay-track" role="group" aria-label="Overlay timeline" tabindex="0">
+                <span class="track-line"></span>
+                <span id="overlayRange" class="overlay-range"></span>
+                <div id="keyframeMarkers" class="keyframe-markers"></div>
+                <div id="playhead" class="playhead"><span></span></div>
+              </div>
+            </div>
+            <div class="timeline-footer">
+              <span id="timelineSummary">Add transform keyframes to animate alignment.</span>
+              <span id="keyframeCount" class="timeline-count">0 keys</span>
+            </div>
+          </section>
+        </section>
+
+        <aside class="side-panel controls-panel" aria-label="Overlay controls">
+          <div class="panel-heading controls-heading">
+            <div>
+              <span class="eyebrow">OVERLAY LAYER</span>
+              <h1>Transform</h1>
+            </div>
+            <span class="overlay-layer-icon" aria-hidden="true">◈</span>
+          </div>
+
+          <div class="transform-fields">
+            <div class="field-group">
+              <div class="field-label-row"><label for="xNumber">Position X</label><span>px</span></div>
+              <div class="range-number-row"><input id="xRange" type="range" min="0" max="1920" value="960" disabled /><input id="xNumber" class="number-input" type="number" value="960" disabled /></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label-row"><label for="yNumber">Position Y</label><span>px</span></div>
+              <div class="range-number-row"><input id="yRange" type="range" min="0" max="1080" value="540" disabled /><input id="yNumber" class="number-input" type="number" value="540" disabled /></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label-row"><label for="scaleNumber">Scale</label><span>×</span></div>
+              <div class="range-number-row"><input id="scaleRange" type="range" min="0.05" max="5" step="0.01" value="1" disabled /><input id="scaleNumber" class="number-input" type="number" min="0.05" max="5" step="0.01" value="1" disabled /></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label-row"><label for="rotationNumber">Rotation</label><span>deg</span></div>
+              <div class="range-number-row"><input id="rotationRange" type="range" min="-180" max="180" step="1" value="0" disabled /><input id="rotationNumber" class="number-input" type="number" min="-360" max="360" step="1" value="0" disabled /></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label-row"><label for="opacityRange">Opacity</label><span id="opacityValue">100%</span></div>
+              <input id="opacityRange" class="wide-range" type="range" min="0" max="1" step="0.01" value="1" disabled />
+            </div>
+          </div>
+
+          <div class="keyframe-actions">
+            <button id="keyframeButton" class="button button-primary button-full" type="button" disabled>Add keyframe</button>
+            <button id="deleteKeyframeButton" class="button button-secondary button-full" type="button" disabled>Delete keyframe</button>
+          </div>
+          <p id="transformHelp" class="helper-copy">Load both assets to adjust the overlay. Drag on the preview to reposition it.</p>
+
+          <section class="export-card">
+            <div class="export-card-heading">
+              <span class="export-icon" aria-hidden="true">↗</span>
+              <div><h2>Export</h2><p>H.264 MP4 · source audio preserved</p></div>
+            </div>
+            <label class="field-label" for="bitrateSelect">Video quality</label>
+            <select id="bitrateSelect" class="select-input">
+              <option value="auto">Automatic</option>
+              <option value="high">High</option>
+              <option value="standard">Standard</option>
+            </select>
+            <div id="exportProgressWrap" class="export-progress-wrap" hidden>
+              <div class="progress-label-row"><span id="exportProgressLabel">Preparing export…</span><span id="exportProgressPercent">0%</span></div>
+              <progress id="exportProgress" max="100" value="0"></progress>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <div id="toast" class="toast" role="alert" hidden></div>
+      <video id="sourceVideo" class="source-video" muted playsinline preload="metadata"></video>
+    </div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
+</html>
